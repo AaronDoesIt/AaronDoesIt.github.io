@@ -1,0 +1,15 @@
+# app-ads.txt for ThumbForge
+#
+# Host this at the ROOT of the developer website listed on the Play Store entry:
+#     https://yourdomain.com/app-ads.txt
+#
+# It tells ad buyers that Google is authorised to sell inventory in this app.
+# Without it a chunk of programmatic demand refuses to bid, which costs revenue.
+#
+# The publisher ID below is yours, taken from the AdMob App ID
+# ca-app-pub-7080073082739819~4406914755
+#
+# After hosting it, AdMob (Apps -> app-ads.txt) will crawl and verify. That can take a
+# day or two, and the Play listing must already show the same domain.
+
+google.com, pub-7080073082739819, DIRECT, f08c47fec0942fa0

@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Home PC Security Incident — Technical Breakdown</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="description" content="How a home Windows workstation was taken over through exposed remote access and used as a node in a stolen-cookie fraud operation, and how it was cleaned up.">
+<style>
+  body{font:16px/1.65 system-ui,sans-serif;max-width:46rem;margin:8vh auto;padding:0 1.25rem 4rem;
+       background:#0f0f11;color:#eceae6}
+  a{color:#ffc13b}
+  h1{font-size:1.6rem;letter-spacing:-.02em;margin-bottom:.4rem;line-height:1.25}
+  h2{font-size:1.1rem;margin-top:2.2rem;padding-top:.6rem;border-top:1px solid #26252a}
+  p,li,td{color:#c9c6c1}
+  strong{color:#eceae6}
+  li{margin:.4rem 0}
+  code{font:.9em ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#eceae6;
+       background:#1b1a1f;padding:.1em .35em;border-radius:4px}
+  .meta{margin:0 0 1.5rem;padding:0;list-style:none;color:#8d8a85;font-size:.95rem}
+  .meta li{margin:.15rem 0;color:#8d8a85}
+  .meta strong{color:#a9a6a1;font-weight:600}
+  .wrap{overflow-x:auto}
+  table{border-collapse:collapse;width:100%;margin:1rem 0;font-size:.95rem}
+  th,td{text-align:left;padding:.5rem .6rem;border-bottom:1px solid #26252a;vertical-align:top}
+  th{color:#eceae6;font-weight:600;border-bottom-color:#3a3940}
+  .note{border-left:3px solid #ffc13b;background:#17161b;padding:.75rem 1rem;margin:1rem 0;border-radius:0 6px 6px 0}
+  .note p{margin:.2rem 0}
+</style>
+
+<h1>Home PC Security Incident — Technical Breakdown</h1>
+<ul class="meta">
+  <li><strong>System:</strong> Home Windows desktop workstation</li>
+  <li><strong>Discovered and remediated:</strong> July 2026</li>
+  <li><strong>Classification:</strong> Confirmed compromise. Unauthorized remote access used for an infostealer / stolen-session fraud operation.</li>
+</ul>
+<p><em>Names, network addresses, port numbers and other details that could identify the owner or the machine have been removed. The rogue account names are kept on purpose: they are the attacker's, and they are useful to anyone checking their own machine.</em></p>
+
+<h2>1. Summary</h2>
+<p>A home Windows workstation was found to have been taken over and used as a worker machine in a
+fraud operation built on stolen browser cookies. Five local administrator accounts the owner never
+created had been added to the machine. Over a long period, the attackers used them to log in over
+Remote Desktop (RDP), load collections of stolen browser cookies belonging to other victims, and run
+a credential-stealing tool against the browser profiles on the machine, including the owner's own
+Chrome, Firefox and Opera data.</p>
+<p>All five accounts and their profiles were deleted, and remote access was rebuilt so the machine
+can only be reached over a private, authenticated Tailscale network instead of the open internet.</p>
+
+<h2>2. The unauthorized accounts</h2>
+<p>Each of the five accounts was enabled and a member of the local Administrators group. Three were
+also in Remote Desktop Users, which allowed them to log in remotely. The names are random
+eight-character strings, which is typical of accounts created by a script rather than a person.</p>
+<div class="wrap">
+<table>
+  <tr><th>Username</th><th>Account ID (RID)</th><th>Privileges</th><th>Notes</th></tr>
+  <tr><td><code>4QNJcVFP</code></td><td>1002</td><td>Administrator</td><td>Earliest account in the sequence</td></tr>
+  <tr><td><code>PF1wm4hj</code></td><td>1003</td><td>Administrator, Remote Desktop</td><td></td></tr>
+  <tr><td><code>pizdatZz</code></td><td>1004</td><td>Administrator, Remote Desktop</td><td>Name is Russian slang; not a Windows default</td></tr>
+  <tr><td><code>Jj6JzfnK</code></td><td>1005</td><td>Administrator, Remote Desktop</td><td>Logon activity continued into 2026</td></tr>
+  <tr><td><code>tCkdl4lZ</code></td><td>1008</td><td>Administrator</td><td>Latest account in the sequence</td></tr>
+</table>
+</div>
+<p><strong>Missing IDs:</strong> Windows hands out account IDs in order and never reuses them. IDs
+1006 and 1007 were missing, which means two more accounts were created and later deleted. The
+attackers cleaned up at least some of their own tracks.</p>
+
+<h2>3. Why these accounts were clearly hostile</h2>
+<ul>
+  <li><strong>Naming:</strong> random eight-character names, the pattern of script-generated backdoor accounts.</li>
+  <li><strong>Privileges:</strong> every account was enabled with full administrator rights, and three could log in over RDP.</li>
+  <li><strong>Created one after another over time:</strong> the account IDs and password-set dates show the accounts were added in sequence over roughly 19 months. This was repeated, deliberate access, not a single event.</li>
+  <li><strong>Language clue:</strong> <code>pizdatZz</code> is Russian slang, not a Windows default and not anything the owner would have created.</li>
+  <li><strong>Recent use:</strong> logon timestamps showed activity into early 2026. The accounts were in active use, not leftovers.</li>
+</ul>
+
+<h2>4. What the attackers were doing</h2>
+<p>The evidence points to the machine being used as a working node for account takeover with stolen
+session cookies:</p>
+<ul>
+  <li><strong>Hands-on remote control:</strong> the rogue accounts logged in interactively over RDP to operate the machine.</li>
+  <li><strong>Stolen victim data brought in:</strong> collections of stolen browser session cookies belonging to third-party victims were loaded onto the machine. This fits using it to test or cash in stolen logins from a clean-looking home connection.</li>
+  <li><strong>Credential theft from the machine itself:</strong> a tool aimed at Windows DPAPI-protected browser data was run. Execution of <code>dpapimig.exe</code> was confirmed. Tools of this kind pull saved passwords, cookies and tokens out of browser profiles; here they targeted the owner's Chrome, Firefox and Opera profiles.</li>
+</ul>
+<div class="note">
+  <p><strong>Note for readers checking their own systems:</strong> <code>dpapimig.exe</code> is also the name of a genuine Windows utility in <code>System32</code> that migrates DPAPI keys. Seeing that file name on its own is not proof of compromise. Check its path and digital signature against the System32 original.</p>
+</div>
+<p><strong>What this meant for the owner:</strong> every password, cookie and session token saved in
+the browsers on that machine had to be treated as stolen.</p>
+
+<h2>5. How they likely got in</h2>
+<p>Several settings on the machine left it exposed:</p>
+<ul>
+  <li><strong>Remote Desktop was open on the network</strong> and, at the time, probably reachable from the internet through a router port-forward.</li>
+  <li><strong>SSH was reachable and allowed password logins</strong>, an easy target for automated password guessing.</li>
+  <li><strong>Windows file sharing (SMB) was listening</strong> on the machine.</li>
+  <li><strong>The owner's own Windows account did not require a password</strong>, which removed the main barrier on local logons.</li>
+</ul>
+
+<h2>6. What couldn't be recovered</h2>
+<p>In May 2026, before the intrusion was found, the machine was restored from a full disk-image
+backup. That restore overwrote the older Remote Desktop connection logs. As a result, the attackers'
+source IP addresses for earlier sessions are gone, and the exact way in and the full timeline can't
+be rebuilt from the machine's own logs. Activity tied to the accounts spans roughly September 2023
+through early 2025, with logons continuing into 2026.</p>
+
+<h2>7. Cleanup performed</h2>
+<ul>
+  <li><strong>Rogue accounts removed:</strong> all five accounts and their user profiles were deleted. Only the owner's account and the disabled built-in accounts remain in the Administrators and Remote Desktop Users groups.</li>
+  <li><strong>Remote Desktop taken off the public internet:</strong> Tailscale was installed, and the Windows firewall now accepts RDP only from Tailscale's private address range (<code>100.64.0.0/10</code>). Reaching the machine now requires an authenticated Tailscale connection.</li>
+  <li><strong>Internet-facing firewall rules shut off:</strong> 38 firewall rules that had exposed the RDP port to the internet were disabled, to be deleted once RDP over Tailscale was confirmed working.</li>
+  <li><strong>Account protections turned on:</strong> account lockout after 5 failed attempts in 15 minutes, and a 12-character minimum password length.</li>
+</ul>
+
+<h2>8. Follow-up actions</h2>
+<ul>
+  <li><strong>Check for a second way in:</strong> the Chrome Remote Desktop host service (<code>remoting_host.exe</code>) was found running. It had to be confirmed as the owner's own tool or removed as possible attacker persistence.</li>
+  <li><strong>Change every saved password:</strong> from a known-clean device, change every password that had been saved in the browsers, and turn on two-factor authentication wherever it's offered.</li>
+  <li><strong>Lock down SSH:</strong> limit it to the Tailscale network and switch from passwords to key-based login.</li>
+  <li><strong>Put a password on the owner's account:</strong> make sure a password is required and set a new one.</li>
+  <li><strong>Remove the disabled firewall rules</strong> once the Tailscale-only path is confirmed.</li>
+</ul>
+
+<h2>9. Outcome</h2>
+<p>The active intrusion was shut down: all five rogue administrator accounts were deleted, and the
+remote access that made the compromise possible was cut back to a single authenticated
+private-network path. Anything saved in the machine's browsers had to be treated as exposed until
+it was changed.</p>
+
+<h2>Checking your own Windows PC</h2>
+<p>The same signs are easy to look for. In an administrator PowerShell window:</p>
+<ul>
+  <li><code>Get-LocalUser</code> lists every local account. Look for names you don't recognize, especially random-looking ones.</li>
+  <li><code>Get-LocalGroupMember Administrators</code> and <code>Get-LocalGroupMember "Remote Desktop Users"</code> show who has admin rights and who can log in remotely.</li>
+  <li><code>Get-LocalUser | Select Name,SID,Enabled,PasswordLastSet,LastLogon</code> shows account IDs (the last number in the SID). Gaps in the sequence mean accounts were created and deleted.</li>
+  <li>Check your router for port-forwards to 3389 (RDP), 22 (SSH) or 445 (SMB), and make sure your Windows account has a password.</li>
+</ul>
+</html>
